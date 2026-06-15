@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>免费AI家教</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="page-container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">小学五年级数学</p>
+        <h1>免费AI家教</h1>
+        <p>10道精选选择题，提交后立即判分并显示正确答案与解析。</p>
+      </div>
+      <div class="hero-card">
+        <h2>开始练习</h2>
+        <p>认真答题，提交后查看得分与解析，帮助你掌握知识点。</p>
+      </div>
+    </header>
+
+    <main>
+      <form id="quiz-form" class="quiz-form">
+        <div id="questions"></div>
+        <div class="actions">
+          <button type="submit" class="submit-btn">提交答案</button>
+          <button type="button" id="reset-btn" class="reset-btn">重新开始</button>
+        </div>
+      </form>
+
+      <section id="result-section" class="result-section hidden">
+        <h2>你的成绩</h2>
+        <p id="score-text" class="score-text"></p>
+        <div id="feedback" class="feedback"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>免费AI家教 · 适配手机端 · 纯HTML、CSS、JavaScript</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
