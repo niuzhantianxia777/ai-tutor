@@ -1,7 +1,7 @@
 const DATA_KEY = "freeAiTutorV3Data";
 const BANK_KEY = "freeAiTutorV3QuestionBank";
 const BANK_VERSION_KEY = "freeAiTutorV3QuestionBankVersion";
-const BANK_VERSION = "quality-fix-v19-diagram";
+const BANK_VERSION = "quality-fix-v21-math-final-qc";
 const OLD_DATA_KEY = "freeAiTutorV2Data";
 const DIFFICULTIES = ["基础题", "提高题", "易错题"];
 
@@ -580,42 +580,40 @@ function renderQuestionFigure(question) {
   if ((question.subjectId || "math") !== "math") return "";
   if (!question.needDiagram) return "";
   const type = normalizeDiagramType(question.diagramType);
-  if (type === "viewCubes") return renderViewFigure(question);
-  if (type === "cubeNet") return renderCubeNetFigure(question);
-  if (type === "lineChart") return renderSampleLineChartFigure(question);
-  if (type === "rotation") return renderMotionFigure(question);
-  if (type === "paintedCube") return renderPaintedCubeFigure(question);
+  if (type === "stackedCubes") return renderViewFigure(question);
+  if (type === "cubeNetCross") return renderCubeNetFigure(question);
+  if (type === "dataLineChart") return renderSampleLineChartFigure(question);
+  if (type === "gridMotion") return renderMotionFigure(question);
+  if (type === "clockRotation") return renderClockFigure(question);
+  if (type === "paintedCubeGrid") return renderPaintedCubeFigure(question);
   return "";
 }
 
-function renderViewFigure() {
+function renderViewFigure(question = {}) {
+  const viewDiagram = buildViewDiagramCells(question);
+  if (!viewDiagram) return "";
+  const key = diagramKey(question);
   return `
-    <figure class="question-figure" aria-label="观察物体示意图">
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="观察物体示意图">
       <svg viewBox="0 0 260 130" role="img">
-        <g fill="#dbeafe" stroke="#2563eb" stroke-width="2">
-          <rect x="55" y="58" width="38" height="38"></rect>
-          <rect x="93" y="58" width="38" height="38"></rect>
-          <rect x="131" y="58" width="38" height="38"></rect>
-          <rect x="93" y="20" width="38" height="38"></rect>
-        </g>
-        <text x="48" y="116">正面</text><text x="178" y="78">左面</text>
+        <desc>${escapeHTML(question.title || "")}</desc>
+        ${viewDiagram}
       </svg>
       <figcaption>观察物体题先看方向，再判断每列能看到几个小正方体。</figcaption>
     </figure>
   `;
 }
 
-function renderCubeNetFigure() {
+function renderCubeNetFigure(question = {}) {
+  const key = diagramKey(question);
+  const nets = getValidCubeNets();
+  const cells = nets[key % nets.length].map(([gx, gy]) => [70 + gx * 34, 55 + gy * 34]);
   return `
-    <figure class="question-figure" aria-label="正方体展开图示意图">
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="正方体展开图示意图">
       <svg viewBox="0 0 260 150" role="img">
+        <desc>${escapeHTML(question.title || "")}</desc>
         <g fill="#fef3c7" stroke="#d97706" stroke-width="2">
-          <rect x="70" y="55" width="34" height="34"></rect>
-          <rect x="104" y="55" width="34" height="34"></rect>
-          <rect x="138" y="55" width="34" height="34"></rect>
-          <rect x="172" y="55" width="34" height="34"></rect>
-          <rect x="104" y="21" width="34" height="34"></rect>
-          <rect x="104" y="89" width="34" height="34"></rect>
+          ${cells.map(([x, y], index) => `<rect x="${x}" y="${y}" width="34" height="34"></rect><text x="${x + 13}" y="${y + 22}">${index + 1}</text>`).join("")}
         </g>
       </svg>
       <figcaption>展开图要想象折叠后六个面是否重合、能否围成正方体。</figcaption>
@@ -625,13 +623,26 @@ function renderCubeNetFigure() {
 
 function renderMotionFigure(question) {
   const point = `${question.knowledgePoint || ""} ${question.title || ""}`;
+  if (/钟面|分针|时针/.test(point)) return renderClockFigure(question);
   const isRotate = /旋转|顺时针|逆时针|角度/.test(point);
+  const isSymmetry = /轴对称|对称轴|对应点|补全/.test(point);
+  const steps = extractFirstNumber(point, isRotate ? 90 : 4);
+  const key = diagramKey(question);
+  const color = key % 2 ? "#dcfce7" : "#ede9fe";
+  const move = inferMotionVector(point, steps);
+  const translatedTriangle = translatePolygon([[50, 75], [70, 45], [90, 75]], move.dx, move.dy);
+  const rotateClockwise = !/逆时针/.test(point);
+  const arc = rotateClockwise
+    ? `<path d="M132 50 A36 36 0 0 1 168 86" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></path>`
+    : `<path d="M168 86 A36 36 0 0 0 132 50" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></path>`;
   return `
-    <figure class="question-figure" aria-label="图形运动示意图">
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="图形运动示意图">
       <svg viewBox="0 0 260 130" role="img">
+        <desc>${escapeHTML(question.title || "")}</desc>
         <defs><marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2563eb"></path></marker></defs>
-        <rect x="35" y="35" width="36" height="36" fill="#dcfce7" stroke="#16a34a" stroke-width="2"></rect>
-        ${isRotate ? `<path d="M138 83 A35 35 0 1 1 172 43" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></path><rect x="168" y="35" width="36" height="36" fill="#dbeafe" stroke="#2563eb" stroke-width="2" transform="rotate(90 186 53)"></rect>` : `<line x1="82" y1="53" x2="162" y2="53" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></line><rect x="178" y="35" width="36" height="36" fill="#dbeafe" stroke="#2563eb" stroke-width="2"></rect>`}
+        ${renderGridBackground()}
+        ${isSymmetry ? renderAxisSymmetryDiagram(color) : `<polygon points="50,75 70,45 90,75" fill="${color}" stroke="#16a34a" stroke-width="2"></polygon>
+        ${isRotate ? `${arc}<circle cx="150" cy="68" r="4" fill="#ef4444"></circle><text x="156" y="64" font-size="11">旋转中心O</text><polygon points="164,38 194,58 164,78" fill="#dbeafe" stroke="#2563eb" stroke-width="2"></polygon><text x="106" y="112">${rotateClockwise ? "顺时针" : "逆时针"}旋转${normalizeRotationAngle(steps)}°</text>` : `<line x1="96" y1="63" x2="${96 + move.dx}" y2="${63 + move.dy}" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></line><polygon points="${translatedTriangle}" fill="#dbeafe" stroke="#2563eb" stroke-width="2"></polygon><text x="108" y="112">${move.label}平移${steps}格</text>`}`}
       </svg>
       <figcaption>图形运动题要看位置、方向、形状和大小分别有没有变化。</figcaption>
     </figure>
@@ -639,11 +650,17 @@ function renderMotionFigure(question) {
 }
 
 function renderSampleLineChartFigure(question = {}) {
-  const values = extractChartValues(question.title || question.question || "");
+  const title = question.title || question.question || "";
+  const values = extractChartValues(title);
+  if (values.length < 2) return "";
   const points = buildLineChartPoints(values);
+  const key = diagramKey(question);
+  const labels = inferChartCategories(title, values.length);
+  const measure = inferChartMeasure(title);
   return `
-    <figure class="question-figure" aria-label="折线统计图示意图">
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="折线统计图示意图">
       <svg viewBox="0 0 260 150" role="img">
+        <desc>${escapeHTML(question.title || "")}</desc>
         <line x1="38" y1="118" x2="225" y2="118" stroke="#64748b" stroke-width="2"></line>
         <line x1="38" y1="118" x2="38" y2="25" stroke="#64748b" stroke-width="2"></line>
         <polyline points="${points}" fill="none" stroke="#0284c7" stroke-width="4" stroke-linecap="round"></polyline>
@@ -651,7 +668,11 @@ function renderSampleLineChartFigure(question = {}) {
           const [x, y] = pair.split(",");
           return `<circle cx="${x}" cy="${y}" r="4"></circle>`;
         }).join("")}</g>
-        <text x="92" y="140">时间</text><text x="6" y="28">数量</text>
+        <g fill="#334155" font-size="10">${points.split(" ").map((pair, index) => {
+          const [x] = pair.split(",");
+          return `<text x="${Number(x) - 10}" y="134">${escapeHTML(labels[index] || `第${index + 1}次`)}</text>`;
+        }).join("")}</g>
+        <text x="102" y="146">时间</text><text x="6" y="28">${escapeHTML(measure)}</text>
       </svg>
       <figcaption>读折线统计图要先看坐标和单位，再看升降趋势。</figcaption>
     </figure>
@@ -660,8 +681,29 @@ function renderSampleLineChartFigure(question = {}) {
 
 function extractChartValues(text) {
   const values = String(text || "").match(/\d+(?:\.\d+)?/g)?.map(Number).filter((item) => Number.isFinite(item)) || [];
-  const filtered = values.filter((item) => item <= 1000).slice(0, 6);
-  return filtered.length >= 2 ? filtered : [20, 35, 28, 46, 58];
+  return values.filter((item) => item <= 1000).slice(0, 6);
+}
+
+function hasDrawableChartData(text) {
+  return extractChartValues(text).length >= 2;
+}
+
+function inferChartCategories(text, count) {
+  const source = String(text || "");
+  if (/星期|周/.test(source)) return ["周一", "周二", "周三", "周四", "周五", "周六"].slice(0, count);
+  if (/月份|月/.test(source)) return Array.from({ length: count }, (_, index) => `${index + 1}月`);
+  if (/年/.test(source)) return Array.from({ length: count }, (_, index) => `${index + 1}年`);
+  return Array.from({ length: count }, (_, index) => `第${index + 1}次`);
+}
+
+function inferChartMeasure(text) {
+  const source = String(text || "");
+  if (/气温|温度|℃|摄氏度/.test(source)) return "气温";
+  if (/降雨|雨量|降水/.test(source)) return "降雨量";
+  if (/销量|销售|卖出/.test(source)) return "销量";
+  if (/人数|学生|参观/.test(source)) return "人数";
+  if (/成绩|分数/.test(source)) return "分数";
+  return "数量";
 }
 
 function buildLineChartPoints(values) {
@@ -679,27 +721,252 @@ function buildLineChartPoints(values) {
   }).join(" ");
 }
 
-function renderPaintedCubeFigure() {
+function renderPaintedCubeFigure(question = {}) {
+  const layers = Math.max(2, Math.min(4, extractFirstNumber(question.title || question.question || "", 3)));
+  const key = diagramKey(question);
+  const lines = Array.from({ length: layers - 1 }, (_, index) => index + 1);
   return `
-    <figure class="question-figure" aria-label="涂色小正方体示意图">
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="涂色小正方体示意图">
       <svg viewBox="0 0 260 160" role="img">
+        <desc>${escapeHTML(question.title || "")}</desc>
         <g stroke="#7c2d12" stroke-width="1.8">
           <polygon points="75,45 155,45 195,78 115,78" fill="#fed7aa"></polygon>
           <polygon points="115,78 195,78 195,130 115,130" fill="#fb923c"></polygon>
           <polygon points="75,45 115,78 115,130 75,98" fill="#ffedd5"></polygon>
           <g stroke="#9a3412" stroke-width="1">
-            <line x1="102" y1="45" x2="142" y2="78"></line><line x1="129" y1="45" x2="169" y2="78"></line>
-            <line x1="88" y1="56" x2="168" y2="56"></line><line x1="101" y1="67" x2="181" y2="67"></line>
-            <line x1="142" y1="78" x2="142" y2="130"></line><line x1="169" y1="78" x2="169" y2="130"></line>
-            <line x1="115" y1="95" x2="195" y2="95"></line><line x1="115" y1="113" x2="195" y2="113"></line>
-            <line x1="88" y1="56" x2="88" y2="109"></line><line x1="101" y1="67" x2="101" y2="120"></line>
+            ${lines.map((i) => {
+              const t = i / layers;
+              return `
+                <line x1="${75 + 80 * t}" y1="45" x2="${115 + 80 * t}" y2="78"></line>
+                <line x1="${115 + 80 * t}" y1="78" x2="${115 + 80 * t}" y2="130"></line>
+                <line x1="${75 + 40 * t}" y1="${45 + 33 * t}" x2="${155 + 40 * t}" y2="${45 + 33 * t}"></line>
+                <line x1="115" y1="${78 + 52 * t}" x2="195" y2="${78 + 52 * t}"></line>
+              `;
+            }).join("")}
           </g>
         </g>
-        <text x="76" y="150">表面涂色后切成小正方体</text>
+        <text x="72" y="150">每条棱分成 ${layers} 份</text>
       </svg>
       <figcaption>涂色小正方体题要分清角上、棱上和面中间的小方块。</figcaption>
     </figure>
   `;
+}
+
+function renderClockFigure(question = {}) {
+  const key = diagramKey(question);
+  const text = question.title || question.question || "";
+  const numbers = String(text).match(/\d+/g)?.map(Number) || [];
+  const start = numbers.includes(12) ? 12 : (numbers[0] || 12);
+  const end = numbers.find((item) => item !== start && item >= 1 && item <= 12) || 3;
+  const startAngle = clockAngle(start);
+  const endAngle = clockAngle(end);
+  return `
+    <figure class="question-figure" data-diagram-key="${key}" aria-label="钟面旋转示意图">
+      <svg viewBox="0 0 260 160" role="img">
+        <desc>${escapeHTML(question.title || "")}</desc>
+        <circle cx="130" cy="78" r="52" fill="#fff" stroke="#334155" stroke-width="2"></circle>
+        ${Array.from({ length: 12 }, (_, i) => {
+          const n = i + 1;
+          const a = clockAngle(n) - 90;
+          const x = 130 + Math.cos(a * Math.PI / 180) * 42;
+          const y = 78 + Math.sin(a * Math.PI / 180) * 42 + 4;
+          return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle">${n}</text>`;
+        }).join("")}
+        <line x1="130" y1="78" x2="${clockHandX(startAngle)}" y2="${clockHandY(startAngle)}" stroke="#16a34a" stroke-width="3"></line>
+        <line x1="130" y1="78" x2="${clockHandX(endAngle)}" y2="${clockHandY(endAngle)}" stroke="#2563eb" stroke-width="3"></line>
+        <path d="M130 28 A50 50 0 0 1 180 78" fill="none" stroke="#f59e0b" stroke-width="3"></path>
+        <text x="68" y="148">从 ${start} 到 ${end} 的钟面旋转</text>
+      </svg>
+      <figcaption>钟面题按一大格30°判断旋转角度。</figcaption>
+    </figure>
+  `;
+}
+
+function renderGridBackground() {
+  return Array.from({ length: 9 }, (_, i) => {
+    const x = 35 + i * 22;
+    const y = 20 + i * 11;
+    return `<line x1="${x}" y1="25" x2="${x}" y2="92" stroke="#e2e8f0"></line><line x1="35" y1="${25 + i * 8}" x2="225" y2="${25 + i * 8}" stroke="#e2e8f0"></line>`;
+  }).join("");
+}
+
+function buildViewDiagramCells(question = {}) {
+  const text = `${question.knowledgePoint || ""} ${question.title || question.question || ""}`;
+  const key = diagramKey(question);
+  const cubes = inferViewCubePositions(text, key);
+  const view = inferViewDirection(text);
+  const cubeSvg = cubes.map(([x, y, z], index) => renderIsoCube(92 + x * 24 - y * 18, 74 - z * 24 + y * 10, index)).join("");
+  const arrow = renderViewArrow(view);
+  const projection = renderViewProjection(cubes, view);
+  return `
+    <g aria-label="小正方体组合">
+      ${cubeSvg}
+      ${arrow}
+    </g>
+    <g aria-label="${view.label}看到的平面图" transform="translate(178,28)">
+      <rect x="-8" y="-10" width="64" height="76" rx="4" fill="#f8fafc" stroke="#cbd5e1"></rect>
+      <text x="2" y="4" font-size="11">${view.label}看</text>
+      ${projection}
+    </g>
+  `;
+}
+
+function inferViewCubePositions(text, key) {
+  const source = String(text || "");
+  if (/田字|上下两层|2层|两层/.test(source)) return [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]];
+  if (/一行3个|3个横排|横向排成一行/.test(source)) return [[0, 0, 0], [1, 0, 0], [2, 0, 0]];
+  if (/前后.*一列|前后排成一列|全部前后/.test(source)) return [[0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0]].slice(0, extractFirstNumber(source, 4));
+  if (/竖直|竖着|叠放|一列2个|一列3个/.test(source)) return [[0, 0, 0], [0, 0, 1], [0, 0, 2]].slice(0, extractFirstNumber(source, 3));
+  if (/L形|L形共4格/.test(source)) return [[0, 0, 0], [1, 0, 0], [2, 0, 0], [0, 1, 0]];
+  if (/2×2×2|2x2x2/.test(source)) return [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1]];
+  if (/2行3列|2×3|2x3/.test(source)) return [[0,0,0],[1,0,0],[2,0,0],[0,1,0],[1,1,0],[2,1,0]];
+  if (/高度分别为1、2、1|1、2、1/.test(source)) return [[0,0,0],[1,0,0],[1,0,1],[2,0,0]];
+  if (/最高3层/.test(source)) return [[0,0,0],[0,0,1],[0,0,2],[1,0,0],[2,0,0]];
+  const variants = [
+    [[0,0,0],[1,0,0],[2,0,0],[1,1,0],[1,1,1]],
+    [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1]],
+    [[0,0,0],[1,0,0],[2,0,0],[0,1,0],[2,0,1]],
+    [[0,0,0],[0,1,0],[1,1,0],[2,1,0],[1,1,1]]
+  ];
+  return variants[Math.abs(key) % variants.length];
+}
+
+function inferViewDirection(text) {
+  const source = String(text || "");
+  if (/上面|俯视/.test(source)) return { label: "从上面", dx: 0, dy: -30 };
+  if (/左面/.test(source)) return { label: "从左面", dx: -36, dy: 0 };
+  if (/右面/.test(source)) return { label: "从右面", dx: 36, dy: 0 };
+  if (/后面/.test(source)) return { label: "从后面", dx: 0, dy: 30 };
+  return { label: "从正面", dx: -28, dy: 18 };
+}
+
+function renderViewArrow(view) {
+  const x1 = 42 - view.dx * 0.35;
+  const y1 = 38 - view.dy * 0.35;
+  const x2 = 68;
+  const y2 = 58;
+  return `
+    <defs><marker id="viewArrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#475569"></path></marker></defs>
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#475569" stroke-width="2" marker-end="url(#viewArrow)"></line>
+    <text x="${Math.max(8, x1 - 10)}" y="${Math.max(14, y1 - 6)}" font-size="11">${view.label}看</text>
+  `;
+}
+
+function renderViewProjection(cubes, view) {
+  const cells = new Set();
+  cubes.forEach(([x, y, z]) => {
+    const a = /左面|右面/.test(view.label) ? y : x;
+    const b = /上面/.test(view.label) ? y : z;
+    cells.add(`${a},${b}`);
+  });
+  return [...cells].map((item) => {
+    const [a, b] = item.split(",").map(Number);
+    const px = 4 + a * 15;
+    const py = 48 - b * 15;
+    return `<rect x="${px}" y="${py}" width="14" height="14" fill="#dbeafe" stroke="#2563eb"></rect>`;
+  }).join("");
+}
+
+function renderIsoCube(x, y, index) {
+  const hue = index % 2 ? ["#bfdbfe", "#93c5fd", "#dbeafe"] : ["#fde68a", "#fbbf24", "#fef3c7"];
+  return `
+    <g>
+      <polygon points="${x},${y} ${x + 18},${y - 10} ${x + 36},${y} ${x + 18},${y + 10}" fill="${hue[2]}" stroke="#475569"></polygon>
+      <polygon points="${x},${y} ${x + 18},${y + 10} ${x + 18},${y + 31} ${x},${y + 21}" fill="${hue[0]}" stroke="#475569"></polygon>
+      <polygon points="${x + 18},${y + 10} ${x + 36},${y} ${x + 36},${y + 21} ${x + 18},${y + 31}" fill="${hue[1]}" stroke="#475569"></polygon>
+    </g>
+  `;
+}
+
+function getValidCubeNets() {
+  return [
+    [[0,1],[1,1],[2,1],[3,1],[1,0],[1,2]],
+    [[0,1],[1,1],[2,1],[3,1],[2,0],[1,2]],
+    [[0,1],[1,1],[2,1],[3,1],[2,0],[2,2]],
+    [[0,1],[1,1],[2,1],[1,0],[1,2],[2,2]],
+    [[0,1],[1,1],[2,1],[0,0],[1,0],[2,2]],
+    [[0,1],[1,1],[2,1],[3,1],[0,2],[1,2]],
+    [[1,0],[1,1],[1,2],[1,3],[0,1],[2,2]],
+    [[1,0],[1,1],[1,2],[1,3],[0,2],[2,1]],
+    [[0,0],[1,0],[1,1],[1,2],[2,2],[1,3]],
+    [[2,0],[1,0],[1,1],[1,2],[0,2],[1,3]],
+    [[0,1],[1,1],[2,1],[2,0],[3,0],[1,2]],
+    [[0,0],[1,0],[2,0],[2,1],[3,1],[1,2]],
+    [[0,2],[1,2],[2,2],[2,1],[3,1],[1,0]],
+    [[0,1],[1,1],[2,1],[0,2],[1,0],[2,0]],
+    [[0,1],[1,1],[2,1],[0,0],[1,2],[2,2]],
+    [[1,0],[0,1],[1,1],[2,1],[3,1],[2,2]],
+    [[2,0],[0,1],[1,1],[2,1],[3,1],[1,2]],
+    [[1,0],[0,1],[1,1],[2,1],[1,2],[1,3]],
+    [[2,0],[0,1],[1,1],[2,1],[2,2],[2,3]],
+    [[0,0],[0,1],[1,1],[2,1],[2,2],[3,2]]
+  ];
+}
+
+function inferMotionVector(text, steps) {
+  const safe = Math.max(1, Math.min(7, Number(steps) || 4));
+  if (/向左|左平移/.test(text)) return { dx: -safe * 14, dy: 0, label: "向左" };
+  if (/向上|上平移/.test(text)) return { dx: 0, dy: -safe * 8, label: "向上" };
+  if (/向下|下平移/.test(text)) return { dx: 0, dy: safe * 8, label: "向下" };
+  return { dx: safe * 14, dy: 0, label: "向右" };
+}
+
+function translatePolygon(points, dx, dy) {
+  return points.map(([x, y]) => `${x + dx},${y + dy}`).join(" ");
+}
+
+function normalizeRotationAngle(value) {
+  const angle = Math.abs(Number(value) || 90) % 360;
+  if ([90, 180, 270].includes(angle)) return angle;
+  if (angle < 135) return 90;
+  if (angle < 225) return 180;
+  return 270;
+}
+
+function renderAxisSymmetryDiagram(color) {
+  return `
+    <line x1="130" y1="24" x2="130" y2="96" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"></line>
+    <text x="136" y="34" font-size="11" fill="#ef4444">对称轴</text>
+    <polygon points="72,75 94,48 104,75" fill="${color}" stroke="#16a34a" stroke-width="2"></polygon>
+    <polygon points="188,75 166,48 156,75" fill="#dbeafe" stroke="#2563eb" stroke-width="2"></polygon>
+    <line x1="104" y1="75" x2="156" y2="75" stroke="#64748b" stroke-dasharray="4 3"></line>
+    <text x="82" y="112">对应点到对称轴距离相等</text>
+  `;
+}
+
+function buildCubeStackLayout(count, key = 0) {
+  const safe = Math.max(1, Math.min(8, Number(count) || 4));
+  const variants = [
+    [[55, 62], [91, 62], [127, 62], [163, 62], [91, 26], [127, 26], [55, 26], [163, 26]],
+    [[55, 62], [91, 62], [127, 62], [91, 26], [127, 26], [163, 26], [55, 26], [163, 62]],
+    [[55, 62], [91, 62], [127, 62], [163, 62], [55, 26], [91, 26], [127, 26], [163, 26]]
+  ];
+  return variants[Math.abs(key) % variants.length].slice(0, safe);
+}
+
+function extractFirstNumber(text, fallback) {
+  const match = String(text || "").match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : fallback;
+}
+
+function hashText(text) {
+  return String(text || "").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+}
+
+function diagramKey(question = {}) {
+  return hashText(`${question.id || ""}${question.title || question.question || ""}${question.knowledgePoint || ""}`);
+}
+
+function clockAngle(num) {
+  return ((num % 12) * 30);
+}
+
+function clockHandX(angle) {
+  return (130 + Math.sin(angle * Math.PI / 180) * 36).toFixed(1);
+}
+
+function clockHandY(angle) {
+  return (78 - Math.cos(angle * Math.PI / 180) * 36).toFixed(1);
 }
 
 function annotateEnglishText(text) {
@@ -2600,37 +2867,43 @@ function normalizeFrequency(value) {
 function normalizeDiagramMeta(question, subjectId, chapterId, knowledgePoint, title) {
   const explicitNeed = question.needDiagram;
   const explicitType = normalizeDiagramType(question.diagramType);
-  if (explicitNeed === true && explicitType !== "none") {
-    return { needDiagram: true, diagramType: explicitType };
-  }
   if (explicitNeed === false || subjectId !== "math") {
     return { needDiagram: false, diagramType: "none" };
   }
 
   const text = `${chapterId} ${knowledgePoint || ""} ${title || ""}`;
   if (isNoDiagramMathQuestion(text)) return { needDiagram: false, diagramType: "none" };
+  if (explicitNeed === true && explicitType !== "none") {
+    return { needDiagram: true, diagramType: explicitType };
+  }
 
   if (chapterId === "view" || /观察物体|三视图|正面|上面|左面|右面|小正方体组合/.test(text)) {
-    return { needDiagram: true, diagramType: "viewCubes" };
+    if (!isDrawableViewQuestion(text)) return { needDiagram: false, diagramType: "none" };
+    return { needDiagram: true, diagramType: "stackedCubes" };
   }
   if (/展开图|正方体展开/.test(text)) {
-    return { needDiagram: true, diagramType: "cubeNet" };
+    return { needDiagram: true, diagramType: "cubeNetCross" };
   }
   if (/涂色|染色|切成.*小正方体|表面涂色/.test(text)) {
-    return { needDiagram: true, diagramType: "paintedCube" };
+    return { needDiagram: true, diagramType: "paintedCubeGrid" };
   }
   if (chapterId === "line-chart" || /折线统计图|折线图|统计图/.test(text)) {
-    return { needDiagram: true, diagramType: "lineChart" };
+    if (!hasDrawableChartData(title)) return { needDiagram: false, diagramType: "none" };
+    return { needDiagram: true, diagramType: "dataLineChart" };
+  }
+  if (/钟面|分针|时针|12走到|数字\d/.test(text)) {
+    return { needDiagram: true, diagramType: "clockRotation" };
   }
   if (chapterId === "motion" || /旋转|平移|轴对称|图形的运动|顺时针|逆时针/.test(text)) {
-    return { needDiagram: true, diagramType: "rotation" };
+    if (!isDrawableMotionQuestion(text)) return { needDiagram: false, diagramType: "none" };
+    return { needDiagram: true, diagramType: "gridMotion" };
   }
   return { needDiagram: false, diagramType: "none" };
 }
 
 function normalizeDiagramType(value) {
   const type = String(value || "").trim();
-  return ["cubeNet", "viewCubes", "lineChart", "rotation", "paintedCube", "none"].includes(type) ? type : "none";
+  return ["cubeNetCross", "stackedCubes", "dataLineChart", "gridMotion", "clockRotation", "paintedCubeGrid", "none"].includes(type) ? type : "none";
 }
 
 function isNoDiagramMathQuestion(text) {
@@ -2640,6 +2913,18 @@ function isNoDiagramMathQuestion(text) {
   if (/体积|容积/.test(text) && !/涂色|切成|无盖|水槽|鱼缸|应用|实际|包装|拼成|露在外面/.test(text)) return true;
   if (/表面积|面积|周长|棱长总和/.test(text) && !/展开图|无盖|贴墙|包装|粉刷|拼成|切开|露在外面|应用/.test(text)) return true;
   return false;
+}
+
+function isDrawableViewQuestion(text) {
+  const source = String(text || "");
+  if (/第一步|一定怎样|能唯一确定|得到的是|主要反映|最适合比较|方向转换|观察方向|平面与立体|读图习惯/.test(source)) return false;
+  return /从正面|从上面|从左面|从右面|从后面|几何体|小正方体|摆成|看到|俯视图|三视图|L形|田字|2×2×2|2行3列/.test(source);
+}
+
+function isDrawableMotionQuestion(text) {
+  const source = String(text || "");
+  if (/什么不变|会改变吗|属于什么运动|固定不动的点|顺时针是按什么方向|有几条对称轴|一定是轴对称|旋转一定要|效果怎样|半周旋转/.test(source)) return false;
+  return /向左|向右|向上|向下|平移\d|平移[一二三四五六七八九十]格|旋转\d|90°|180°|270°|绕点|钟面|分针|时针|对称轴|对应点|补全/.test(source);
 }
 
 function normalizeExamTypes(value) {
