@@ -1,7 +1,7 @@
 const DATA_KEY = "freeAiTutorV3Data";
 const BANK_KEY = "freeAiTutorV3QuestionBank";
 const BANK_VERSION_KEY = "freeAiTutorV3QuestionBankVersion";
-const BANK_VERSION = "quality-fix-v18";
+const BANK_VERSION = "quality-fix-v19-diagram";
 const OLD_DATA_KEY = "freeAiTutorV2Data";
 const DIFFICULTIES = ["基础题", "提高题", "易错题"];
 
@@ -162,8 +162,7 @@ const dom = {
   reportPage: $("#reportPage"),
   chapterAnalysis: $("#chapterAnalysis"),
   knowledgeTopList: $("#knowledgeTopList"),
-  trendCharts: $("#trendCharts"),
-  parentAdvice: $("#parentAdvice")
+  trendCharts: $("#trendCharts")
 };
 
 init();
@@ -535,21 +534,31 @@ function renderQuestions() {
   }
   dom.quizForm.innerHTML = currentQuestions.map((question, questionIndex) => {
     const isChineseQuestion = (question.subjectId || selectedSubjectId) === "chinese";
+    const isEnglishQuestion = (question.subjectId || selectedSubjectId) === "english";
     const showTeacherButton = !selectedExamType || currentSubmitted;
     const topicText = isChineseQuestion
       ? question.chapter
       : `${question.chapter} · ${question.difficulty} · ${question.knowledgePoint}`;
     const knowledgeText = isChineseQuestion ? "本单元语文字词与阅读能力" : question.knowledgePoint;
+    const titleHTML = isEnglishQuestion ? annotateEnglishText(question.title) : escapeHTML(question.title);
+    const supportHTML = isEnglishQuestion ? renderEnglishQuestionSupport(question) : "";
+    const figureHTML = renderQuestionFigure(question);
     const optionHTML = question.options.map((option, optionIndex) => `
       <label class="option">
         <input type="radio" name="question-${questionIndex}" value="${escapeHTML(option)}">
         <span>${String.fromCharCode(65 + optionIndex)}. ${escapeHTML(option)}</span>
       </label>
     `).join("");
+    const examSectionHTML = selectedExamType && (questionIndex === 0 || questionIndex === 10)
+      ? `<div class="exam-section-title">${questionIndex === 0 ? "一、选择题" : "二、综合应用"}</div>`
+      : "";
     return `
+      ${examSectionHTML}
       <article class="question-card" data-id="${question.id}">
         <span class="topic">${escapeHTML(topicText)}</span>
-        <h3 class="question-title">${questionIndex + 1}. ${escapeHTML(question.title)}</h3>
+        <h3 class="question-title">${questionIndex + 1}. ${titleHTML}</h3>
+        ${supportHTML}
+        ${figureHTML}
         <div class="options">${optionHTML}</div>
         ${showTeacherButton ? `<div class="question-actions">
           <button class="secondary-btn ai-explain-btn" data-id="${escapeHTML(question.id)}" data-teacher-mode="${currentSubmitted ? "full" : "hint"}" type="button">${currentSubmitted ? "AI老师讲解" : "学习提示"}</button>
@@ -560,12 +569,191 @@ function renderQuestions() {
           <p><strong>知识点：</strong>${escapeHTML(knowledgeText)}</p>
           <p><strong>详细步骤：</strong>${escapeHTML(question.explanation)}</p>
           <p><strong>常见错误：</strong>${escapeHTML(question.commonMistake)}</p>
-          <p><strong>学习建议：</strong>${escapeHTML(question.encouragement)}</p>
         </div>
       </article>
     `;
   }).join("");
   bindQuestionActionButtons(dom.quizForm, currentQuestions);
+}
+
+function renderQuestionFigure(question) {
+  if ((question.subjectId || "math") !== "math") return "";
+  if (!question.needDiagram) return "";
+  const type = normalizeDiagramType(question.diagramType);
+  if (type === "viewCubes") return renderViewFigure(question);
+  if (type === "cubeNet") return renderCubeNetFigure(question);
+  if (type === "lineChart") return renderSampleLineChartFigure(question);
+  if (type === "rotation") return renderMotionFigure(question);
+  if (type === "paintedCube") return renderPaintedCubeFigure(question);
+  return "";
+}
+
+function renderViewFigure() {
+  return `
+    <figure class="question-figure" aria-label="观察物体示意图">
+      <svg viewBox="0 0 260 130" role="img">
+        <g fill="#dbeafe" stroke="#2563eb" stroke-width="2">
+          <rect x="55" y="58" width="38" height="38"></rect>
+          <rect x="93" y="58" width="38" height="38"></rect>
+          <rect x="131" y="58" width="38" height="38"></rect>
+          <rect x="93" y="20" width="38" height="38"></rect>
+        </g>
+        <text x="48" y="116">正面</text><text x="178" y="78">左面</text>
+      </svg>
+      <figcaption>观察物体题先看方向，再判断每列能看到几个小正方体。</figcaption>
+    </figure>
+  `;
+}
+
+function renderCubeNetFigure() {
+  return `
+    <figure class="question-figure" aria-label="正方体展开图示意图">
+      <svg viewBox="0 0 260 150" role="img">
+        <g fill="#fef3c7" stroke="#d97706" stroke-width="2">
+          <rect x="70" y="55" width="34" height="34"></rect>
+          <rect x="104" y="55" width="34" height="34"></rect>
+          <rect x="138" y="55" width="34" height="34"></rect>
+          <rect x="172" y="55" width="34" height="34"></rect>
+          <rect x="104" y="21" width="34" height="34"></rect>
+          <rect x="104" y="89" width="34" height="34"></rect>
+        </g>
+      </svg>
+      <figcaption>展开图要想象折叠后六个面是否重合、能否围成正方体。</figcaption>
+    </figure>
+  `;
+}
+
+function renderMotionFigure(question) {
+  const point = `${question.knowledgePoint || ""} ${question.title || ""}`;
+  const isRotate = /旋转|顺时针|逆时针|角度/.test(point);
+  return `
+    <figure class="question-figure" aria-label="图形运动示意图">
+      <svg viewBox="0 0 260 130" role="img">
+        <defs><marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2563eb"></path></marker></defs>
+        <rect x="35" y="35" width="36" height="36" fill="#dcfce7" stroke="#16a34a" stroke-width="2"></rect>
+        ${isRotate ? `<path d="M138 83 A35 35 0 1 1 172 43" fill="none" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></path><rect x="168" y="35" width="36" height="36" fill="#dbeafe" stroke="#2563eb" stroke-width="2" transform="rotate(90 186 53)"></rect>` : `<line x1="82" y1="53" x2="162" y2="53" stroke="#2563eb" stroke-width="3" marker-end="url(#arrowHead)"></line><rect x="178" y="35" width="36" height="36" fill="#dbeafe" stroke="#2563eb" stroke-width="2"></rect>`}
+      </svg>
+      <figcaption>图形运动题要看位置、方向、形状和大小分别有没有变化。</figcaption>
+    </figure>
+  `;
+}
+
+function renderSampleLineChartFigure(question = {}) {
+  const values = extractChartValues(question.title || question.question || "");
+  const points = buildLineChartPoints(values);
+  return `
+    <figure class="question-figure" aria-label="折线统计图示意图">
+      <svg viewBox="0 0 260 150" role="img">
+        <line x1="38" y1="118" x2="225" y2="118" stroke="#64748b" stroke-width="2"></line>
+        <line x1="38" y1="118" x2="38" y2="25" stroke="#64748b" stroke-width="2"></line>
+        <polyline points="${points}" fill="none" stroke="#0284c7" stroke-width="4" stroke-linecap="round"></polyline>
+        <g fill="#f59e0b">${points.split(" ").map((pair) => {
+          const [x, y] = pair.split(",");
+          return `<circle cx="${x}" cy="${y}" r="4"></circle>`;
+        }).join("")}</g>
+        <text x="92" y="140">时间</text><text x="6" y="28">数量</text>
+      </svg>
+      <figcaption>读折线统计图要先看坐标和单位，再看升降趋势。</figcaption>
+    </figure>
+  `;
+}
+
+function extractChartValues(text) {
+  const values = String(text || "").match(/\d+(?:\.\d+)?/g)?.map(Number).filter((item) => Number.isFinite(item)) || [];
+  const filtered = values.filter((item) => item <= 1000).slice(0, 6);
+  return filtered.length >= 2 ? filtered : [20, 35, 28, 46, 58];
+}
+
+function buildLineChartPoints(values) {
+  const width = 170;
+  const left = 45;
+  const top = 35;
+  const height = 78;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const span = Math.max(1, max - min);
+  return values.map((value, index) => {
+    const x = left + (values.length === 1 ? 0 : (index * width) / (values.length - 1));
+    const y = top + height - ((value - min) / span) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+function renderPaintedCubeFigure() {
+  return `
+    <figure class="question-figure" aria-label="涂色小正方体示意图">
+      <svg viewBox="0 0 260 160" role="img">
+        <g stroke="#7c2d12" stroke-width="1.8">
+          <polygon points="75,45 155,45 195,78 115,78" fill="#fed7aa"></polygon>
+          <polygon points="115,78 195,78 195,130 115,130" fill="#fb923c"></polygon>
+          <polygon points="75,45 115,78 115,130 75,98" fill="#ffedd5"></polygon>
+          <g stroke="#9a3412" stroke-width="1">
+            <line x1="102" y1="45" x2="142" y2="78"></line><line x1="129" y1="45" x2="169" y2="78"></line>
+            <line x1="88" y1="56" x2="168" y2="56"></line><line x1="101" y1="67" x2="181" y2="67"></line>
+            <line x1="142" y1="78" x2="142" y2="130"></line><line x1="169" y1="78" x2="169" y2="130"></line>
+            <line x1="115" y1="95" x2="195" y2="95"></line><line x1="115" y1="113" x2="195" y2="113"></line>
+            <line x1="88" y1="56" x2="88" y2="109"></line><line x1="101" y1="67" x2="101" y2="120"></line>
+          </g>
+        </g>
+        <text x="76" y="150">表面涂色后切成小正方体</text>
+      </svg>
+      <figcaption>涂色小正方体题要分清角上、棱上和面中间的小方块。</figcaption>
+    </figure>
+  `;
+}
+
+function annotateEnglishText(text) {
+  const notes = {
+    travel: "旅行",
+    excited: "兴奋的",
+    usually: "通常",
+    weekend: "周末",
+    museum: "博物馆",
+    healthy: "健康的",
+    invite: "邀请",
+    special: "特别的",
+    quiet: "安静的",
+    bridge: "桥",
+    season: "季节",
+    trip: "旅行",
+    plan: "计划",
+    favourite: "最喜欢的",
+    weather: "天气",
+    vegetable: "蔬菜",
+    because: "因为",
+    library: "图书馆",
+    cinema: "电影院",
+    hospital: "医院",
+    playground: "操场",
+    toothache: "牙疼",
+    polite: "有礼貌的",
+    interesting: "有趣的",
+    tomorrow: "明天",
+    yesterday: "昨天",
+    grandparents: "祖父母",
+    breakfast: "早餐",
+    station: "车站",
+    probably: "可能",
+    traffic: "交通",
+    rules: "规则",
+    different: "不同的",
+    umbrella: "雨伞",
+    thirsty: "口渴的"
+  };
+  let output = escapeHTML(text || "");
+  Object.entries(notes).forEach(([word, note]) => {
+    const pattern = new RegExp(`\\b${word}\\b(?!（)`, "gi");
+    output = output.replace(pattern, (match) => `${match}（${note}）`);
+  });
+  return output;
+}
+
+function renderEnglishQuestionSupport(question) {
+  const title = question.title || "";
+  const hardWords = ["would like", "usually", "probably", "traffic", "because", "favourite", "different", "museum", "library", "cinema", "hospital", "grandparents"];
+  const needsHelp = title.length > 70 || hardWords.some((word) => title.toLowerCase().includes(word));
+  if (!needsHelp) return "";
+  return `<p class="question-support">中文提示：这道题主要帮助你理解题目情境，请根据英文中的人物、时间、地点或动作来判断。</p>`;
 }
 
 function gradeQuiz() {
@@ -727,7 +915,6 @@ function renderStudyReport() {
   if (dom.chapterAnalysis) dom.chapterAnalysis.innerHTML = renderChapterAnalysis() + renderChineseSpecialReport();
   if (dom.knowledgeTopList) dom.knowledgeTopList.innerHTML = renderKnowledgeTopList();
   if (dom.trendCharts) dom.trendCharts.innerHTML = renderTrendCharts();
-  if (dom.parentAdvice) dom.parentAdvice.innerHTML = buildParentAdvice(week);
 }
 
 function renderWeeklySummaryCard(week) {
@@ -928,7 +1115,6 @@ function renderWrongBook() {
         <p><strong>知识点：</strong>${escapeHTML((item.subjectId || findSubjectByChapterId(item.chapterId).id) === "chinese" ? "本单元语文字词与阅读能力" : (item.knowledgePoint || "综合练习"))}</p>
         <p><strong>详细讲解：</strong>${escapeHTML(item.explanation || item.analysis || "")}</p>
         <p><strong>常见错误：</strong>${escapeHTML(item.commonMistake || "审题不细或计算过程省略。")}</p>
-        <p><strong>学习建议：</strong>${escapeHTML(item.encouragement || "认真复盘这道题，下次会更稳。")}</p>
         <p><strong>保存时间：</strong>${escapeHTML(item.time)}</p>
         <div class="question-actions">
           <button class="secondary-btn ai-explain-btn" data-id="${escapeHTML(item.id)}" type="button">AI老师讲解</button>
@@ -1038,41 +1224,6 @@ function buildSolvingIdea(question) {
 function buildStudyTip(question) {
   const point = question.knowledgePoint || "这个知识点";
   return `练习“${point}”时，建议先圈出关键词，再写出理由。做完后用答案反推一次，能减少粗心错误。`;
-}
-
-function buildProblemHint(question) {
-  const point = question.knowledgePoint || "";
-  const subjectId = question.subjectId || findSubjectByChapterId(question.chapterId).id;
-  if (subjectId === "chinese") {
-    const title = question.title || "";
-    if (point.includes("生字") || title.includes("读音") || title.includes("字形") || title.includes("错别字")) {
-      return "先判断考读音还是字形。读音看声调，字形比关键部件，再逐项排除。";
-    }
-    if (point.includes("词语") || title.includes("近义词") || title.includes("反义词") || title.includes("词语")) {
-      return "先理解词语大意，再放回句子语境判断，注意近义、反义和运用区别。";
-    }
-    if (point.includes("课文内容")) {
-      return "先回忆课文人物、事件和结果，再看选项是否与原文内容一致，避免凭印象选。";
-    }
-    if (point.includes("阅读理解")) {
-      return "先读完整材料，圈人物、事件和情感词，再判断题目问内容、原因还是态度。";
-    }
-    if (point.includes("古诗文")) {
-      return "先看关键词和注释，理解句子大意，再联系语境或画面判断，不按字面硬猜。";
-    }
-    return "先判断考字词、课文还是阅读，再回到原文或语境中找依据，逐项排除。";
-  }
-  if (point.includes("因数")) return "先列能整除题中数字的数，再按题目条件筛选，不急着看选项，防止漏数。";
-  if (point.includes("倍数")) return "先看是否考2、3、5倍数特征，再用个位或数字和快速排除，最后核对题意。";
-  if (point.includes("表面积")) return "先判断要算几个面，再套面积公式；无盖、贴墙题要少算面并检查单位。";
-  if (point.includes("体积") || point.includes("容积")) return "先找长宽高，判断问体积还是容积，再注意单位换算和结果单位。";
-  if (point.includes("分数")) return "先看分母是否相同，不同先通分；结果能约分时要化简，再比较选项。";
-  if (point.includes("观察") || point.includes("三视图")) return "先确定观察方向，再想遮挡关系，不把平面图直接当立体个数来数。";
-  if (point.includes("旋转") || point.includes("平移") || point.includes("对称")) return "先判断运动类型，再看形状、大小、方向和位置哪些改变，哪些不变。";
-  if (point.includes("折线") || point.includes("统计")) return "先看横轴、纵轴和单位，再读点的位置与折线升降趋势，别漏看标题。";
-  if (point.includes("单词")) return "先看关键词中文意思或类别，再比较选项词义，排除不相关词和近形词。";
-  if (point.includes("句型")) return "先判断问句类型和主语，再看时态、be动词或助动词是否匹配。";
-  return "根据本题所属知识点选择对应方法，优先检查概念条件、单位或语境是否匹配。";
 }
 
 function buildProblemHint(question) {
@@ -2415,6 +2566,7 @@ function normalizeQuestion(question) {
     ? question.options.map(String).filter(Boolean)
     : String(question.options || "").split("|").map((item) => item.trim()).filter(Boolean);
   const title = String(question.title || question.question || question.题目 || "").trim();
+  const diagram = normalizeDiagramMeta(question, subjectId, chapter.id, String(question.knowledgePoint || question.知识点 || ""), title);
   return {
     id: String(question.id || createQuestionId()),
     subjectId,
@@ -2430,6 +2582,8 @@ function normalizeQuestion(question) {
     knowledgePoint: String(question.knowledgePoint || question.知识点 || "综合练习").trim(),
     frequency: normalizeFrequency(question.frequency || question.考频 || question.examFrequency || difficulty),
     examTypes: normalizeExamTypes(question.examTypes || question.examType || question.试卷类型),
+    needDiagram: diagram.needDiagram,
+    diagramType: diagram.diagramType,
     commonMistake: String(question.commonMistake || question.常见错误 || makeDefaultMistake(difficulty)).trim(),
     encouragement: String(question.encouragement || question.鼓励语 || makeDefaultEncouragement(difficulty)).trim()
   };
@@ -2441,6 +2595,51 @@ function normalizeFrequency(value) {
   if (text.includes("高频") || text === "基础题") return "高频";
   if (text.includes("中频") || text === "提高题") return "中频";
   return "中频";
+}
+
+function normalizeDiagramMeta(question, subjectId, chapterId, knowledgePoint, title) {
+  const explicitNeed = question.needDiagram;
+  const explicitType = normalizeDiagramType(question.diagramType);
+  if (explicitNeed === true && explicitType !== "none") {
+    return { needDiagram: true, diagramType: explicitType };
+  }
+  if (explicitNeed === false || subjectId !== "math") {
+    return { needDiagram: false, diagramType: "none" };
+  }
+
+  const text = `${chapterId} ${knowledgePoint || ""} ${title || ""}`;
+  if (isNoDiagramMathQuestion(text)) return { needDiagram: false, diagramType: "none" };
+
+  if (chapterId === "view" || /观察物体|三视图|正面|上面|左面|右面|小正方体组合/.test(text)) {
+    return { needDiagram: true, diagramType: "viewCubes" };
+  }
+  if (/展开图|正方体展开/.test(text)) {
+    return { needDiagram: true, diagramType: "cubeNet" };
+  }
+  if (/涂色|染色|切成.*小正方体|表面涂色/.test(text)) {
+    return { needDiagram: true, diagramType: "paintedCube" };
+  }
+  if (chapterId === "line-chart" || /折线统计图|折线图|统计图/.test(text)) {
+    return { needDiagram: true, diagramType: "lineChart" };
+  }
+  if (chapterId === "motion" || /旋转|平移|轴对称|图形的运动|顺时针|逆时针/.test(text)) {
+    return { needDiagram: true, diagramType: "rotation" };
+  }
+  return { needDiagram: false, diagramType: "none" };
+}
+
+function normalizeDiagramType(value) {
+  const type = String(value || "").trim();
+  return ["cubeNet", "viewCubes", "lineChart", "rotation", "paintedCube", "none"].includes(type) ? type : "none";
+}
+
+function isNoDiagramMathQuestion(text) {
+  if (/因数|倍数|公因数|公倍数|质数|合数|最大公因数|最小公倍数/.test(text)) return true;
+  if (/分数加减|同分母|异分母|约分|通分|假分数|带分数|单位1/.test(text)) return true;
+  if (/单位换算|m³|dm³|cm³|立方米|立方分米|立方厘米|升|毫升/.test(text) && !/容器|水槽|鱼缸/.test(text)) return true;
+  if (/体积|容积/.test(text) && !/涂色|切成|无盖|水槽|鱼缸|应用|实际|包装|拼成|露在外面/.test(text)) return true;
+  if (/表面积|面积|周长|棱长总和/.test(text) && !/展开图|无盖|贴墙|包装|粉刷|拼成|切开|露在外面|应用/.test(text)) return true;
+  return false;
 }
 
 function normalizeExamTypes(value) {
@@ -2717,23 +2916,6 @@ function getWeakReportChapter() {
   return getChapterPerformance()
     .filter((item) => item.answered > 0 || item.wrongTotal > 0)
     .sort((a, b) => a.accuracy - b.accuracy || b.wrongTotal - a.wrongTotal)[0] || null;
-}
-
-function buildParentAdvice(weekReport) {
-  const strong = getStrongChapter();
-  const weak = getWeakReportChapter();
-  const recommend = weak || getWeakChapter() || chapters[0];
-  const weakPoints = getTopWrongKnowledgePoints(3);
-  return `
-    <article class="advice-card">
-      <h3>AI学习建议</h3>
-      <p>本周共完成 ${weekReport.answered} 题，正确率 ${weekReport.accuracy}%，获得 ${weekReport.points} 积分，累计学习约 ${weekReport.minutes} 分钟。</p>
-      <p>${strong ? `${escapeHTML(strong.name)}掌握良好。` : "目前练习数据还不多，建议先保持每天稳定练习。"}</p>
-      <p>${escapeHTML(recommend.name)}正确率偏低，建议重点练习：</p>
-      ${weakPoints.length ? `<ul>${weakPoints.map((item) => `<li>${escapeHTML(item.name)}</li>`).join("")}</ul>` : "<p>基础概念、易错题复盘和单元练习巩固。</p>"}
-      <p>建议每天练习 20 分钟，先做基础题，再复盘错题本。</p>
-    </article>
-  `;
 }
 
 function getWeakKnowledgePoints(chapterId) {

@@ -351,7 +351,67 @@ h2 { margin-bottom: 6px; font-size: 24px; }
   stroke-width: 2;
 }
 
+.submit-area {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(20, 108, 148, 0.25);
+  border-radius: 8px;
+  background: #eef8fb;
+  text-align: center;
+}
+.submit-area p {
+  margin: 0;
+  color: var(--primary-dark);
+  font-weight: 800;
+}
+.submit-area button {
+  min-width: 220px;
+  min-height: 52px;
+  padding: 13px 28px;
+  font-size: 18px;
+}
+.exam-section-title {
+  margin: 8px 0 2px;
+  padding: 10px 12px;
+  border-left: 5px solid var(--primary);
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--primary-dark);
+  font-size: 18px;
+  font-weight: 900;
+}
+
 .question-title, .wrong-title { margin: 10px 0 14px; font-size: 18px; line-height: 1.6; }
+.question-support {
+  margin: -4px 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.question-figure {
+  margin: 8px 0 14px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.question-figure svg {
+  display: block;
+  width: 100%;
+  max-height: 190px;
+}
+.question-figure figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
 .options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .option {
   display: flex;
@@ -574,6 +634,7 @@ h2 { margin-bottom: 6px; font-size: 24px; }
   .options { grid-template-columns: 1fr; }
   .question-actions { display: flex; justify-content: center; }
   .question-actions button { width: auto; }
+  .submit-area button { width: 100%; min-width: 0; }
   .teacher-modal { padding: 10px; align-items: flex-end; }
   .teacher-modal-panel { max-height: 92vh; }
   .record-line { grid-template-columns: 1fr; }
